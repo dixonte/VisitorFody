@@ -50,4 +50,5 @@ Temporary Items
 .vs/**
 **/bin/**
 **/obj/**
+Tools/**
 packages/**
