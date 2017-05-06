@@ -115,6 +115,7 @@ namespace Visitor.Fody
                     visitorTypeDefintion.Interfaces.Add(new InterfaceImplementation(interfaceTypeReference));
 
                     var impls = new Dictionary<TypeReference, Instruction[]>();
+                    var implsBy = new Dictionary<TypeReference, string>();
 
                     var interfaceMethodDefinitions = interfaceTypeDefinition.Methods.Where(x =>
                         x.Parameters.Count == 1
@@ -182,6 +183,7 @@ namespace Visitor.Fody
                                     Instruction.Create(OpCodes.Call, method),
                                     Instruction.Create(OpCodes.Ret)
                                 });
+                                implsBy.Add(parameterType, $"{visitorTypeDefintion.Name}.{method.Name}({string.Join(", ", method.Parameters.Select(x => x.ParameterType.Name))})");
                             }
                         }
 
@@ -197,7 +199,7 @@ namespace Visitor.Fody
 
                                 var parameterType = propTypeRef.GenericArguments.First();
 
-                                //LogInfo($"\t{visitorTypeDefintion.Name}.{prop.Name} = {prop.PropertyType.FullName} => {parameterType} | {propTypeDef.Methods.Where(x => x.Name == "Invoke").First()}");
+                                //LogInfo($"\t{visitorTypeDefintion.Name}.{prop.Name} => {prop.PropertyType.FullName}");
 
                                 var invokeMethodDef = propTypeDef.Methods.Where(x => x.Name == "Invoke").First();
                                 var invokeMethodRef = ModuleDefinition.ImportReference(invokeMethodDef).MakeGeneric(propTypeRef.GenericArguments.ToArray());
@@ -219,6 +221,7 @@ namespace Visitor.Fody
                                         Instruction.Create(OpCodes.Callvirt, ModuleDefinition.ImportReference(invokeMethodRef)),
                                         opRet
                                     });
+                                    implsBy.Add(parameterType, $"{visitorTypeDefintion.Name}.{prop.Name} => {prop.PropertyType.FullName}");
                                 }
                             }
                         }
@@ -247,6 +250,11 @@ namespace Visitor.Fody
                         if (impls.ContainsKey(parameterType))
                         {
                             impl.Body.Instructions.Append(impls[parameterType]);
+
+                            if (implsBy.ContainsKey(parameterType))
+                            {
+                                LogInfo($"\t\t\\-> {implsBy[parameterType]}");
+                            }
                         }
                         else
                         {
