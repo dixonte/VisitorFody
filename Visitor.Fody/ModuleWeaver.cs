@@ -17,6 +17,8 @@ namespace Visitor.Fody
         public ModuleDefinition ModuleDefinition { get; set; }
 
         private MethodReference NotImplementedExceptionRef { get; set; }
+        private TypeReference GenericActionRef { get; set; }
+        private TypeDefinition GenericActionDefinition { get; set; }
 
 
         public ModuleWeaver()
@@ -29,6 +31,8 @@ namespace Visitor.Fody
         public void Execute()
         {
             NotImplementedExceptionRef = ModuleDefinition.ImportReference(typeof(NotImplementedException).GetConstructor(new Type[0]));
+            GenericActionRef = ModuleDefinition.ImportReference(typeof(Action<>)); 
+            GenericActionDefinition = GenericActionRef.Resolve();
 
             AddAcceptMethods();
 
@@ -162,7 +166,7 @@ namespace Visitor.Fody
                                 m.Parameters.Count == 1 
                                 && m.Parameters[0].ParameterType == interfaceTypeReference
                             ).Any()
-                        ).ToList();
+                        );
 
                         foreach (var method in visitorMethods)
                         {
@@ -181,22 +185,45 @@ namespace Visitor.Fody
                             }
                         }
 
+
+                        //var visitorProperties = visitorTypeDefintion.Properties.Where(x =>
+                        //    x.PropertyType is GenericInstanceType
+                        //).Cast<GenericInstanceType>().Where(x =>
+                        //    x.generic
+                        //);
+
                         foreach (var prop in visitorTypeDefintion.Properties)
                         {
                             //var propDef = prop.Resolve();
                             if (prop.PropertyType is GenericInstanceType propTypeRef)
                             {
                                 var propTypeDef = propTypeRef.Resolve();
+
+                                if (propTypeDef != GenericActionDefinition)
+                                    continue;
+
                                 var parameterType = propTypeRef.GenericArguments.First();
-                                
-                                LogInfo($"\t{visitorTypeDefintion.Name}.{prop.Name} = {prop.PropertyType.FullName} => {parameterType} | {propTypeDef.Methods.Where(x => x.Name == "Invoke").First()}");
 
+                                LogInfo($"\t{visitorTypeDefintion.Name}.{prop.Name} = {prop.PropertyType.FullName} => {parameterType} | {propTypeDef.Methods.Where(x => x.Name == "Invoke").First().GetGeneric()}");
 
-                                var labelNotNull = Instruction.Create(OpCodes.Nop);
-                                var opRet = Instruction.Create(OpCodes.Ret);
-                                
+                                //var invokeOfTypeRef = new GenericInstanceMethod(propTypeDef.Methods.Where(x => x.Name == "Invoke").First());
+                                //invokeOfTypeRef.DeclaringType = ModuleDefinition.ImportReference(prop.PropertyType);
+                                //var invokeOfTypeRef = new MethodReference()
+                                var invokeOfTypeGenericParameter = new GenericParameter(prop.PropertyType);
+                                var invokeOfTypeRef = new MethodReference("Invoke", ModuleDefinition.TypeSystem.Void, prop.PropertyType);
+                                invokeOfTypeRef.HasThis = true;
+                                invokeOfTypeRef.GenericParameters.Add(invokeOfTypeGenericParameter);
+                                invokeOfTypeRef.Parameters.Add(new ParameterDefinition(invokeOfTypeGenericParameter));
+
+                                //propTypeDef.Methods.Where(x => x.Name == "Invoke").First().MakeHostInstanceGeneric
+
+                                //var actionInvokeDefinition = new MethodDefinition()
+
                                 if (!impls.ContainsKey(parameterType))
                                 {
+                                    var labelNotNull = Instruction.Create(OpCodes.Nop);
+                                    var opRet = Instruction.Create(OpCodes.Ret);
+
                                     impls.Add(parameterType, new Instruction[] {
                                         Instruction.Create(OpCodes.Ldarg_0),
                                         Instruction.Create(OpCodes.Call, ModuleDefinition.ImportReference(prop.GetMethod)),
@@ -206,7 +233,7 @@ namespace Visitor.Fody
                                         Instruction.Create(OpCodes.Br, opRet),
                                         labelNotNull,
                                         Instruction.Create(OpCodes.Ldarg_1),
-                                        Instruction.Create(OpCodes.Callvirt, ModuleDefinition.ImportReference(propTypeDef.Methods.Where(x => x.Name == "Invoke").First().GetGeneric())),
+                                        Instruction.Create(OpCodes.Callvirt, ModuleDefinition.ImportReference(invokeOfTypeRef)),
                                         opRet
                                     });
                                 }
@@ -245,12 +272,14 @@ namespace Visitor.Fody
                                 case ActionOnMissing.CompileError:
                                     throw new WeavingException($"No implemenation found for {interfaceTypeDefinition.Name}::{interfaceMethod.Name}({string.Join(", ", interfaceMethod.Parameters.Select(x => x.ParameterType.Name))}) in {visitorTypeDefintion.FullName}");
                                 case ActionOnMissing.ThrowException:
+                                    LogInfo($"\t\tthrow NotImplementedException");
                                     impl.Body.Instructions.Append(
                                         Instruction.Create(OpCodes.Newobj, NotImplementedExceptionRef),
                                         Instruction.Create(OpCodes.Throw)
                                     );
                                     break;
                                 case ActionOnMissing.NoOp:
+                                    LogInfo($"\t\tno-op");
                                     impl.Body.Instructions.Append(
                                         Instruction.Create(OpCodes.Ret)
                                     );
