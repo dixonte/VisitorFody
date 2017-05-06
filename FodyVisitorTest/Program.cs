@@ -33,7 +33,10 @@ namespace FodyVisitorTest
                 })
             }, ActionOnMissing.NoOp);
             var concreteVisitor = VisitorFactory<IPersonVisitor>.Create(new ConcreteVisitor());
-            var concreteDelegate = VisitorFactory<IPersonVisitor>.Create(new ConcreteDelegate());
+            var concreteDelegate = VisitorFactory<IPersonVisitor>.Create(new ConcreteDelegate()
+            {
+                Employee = new Action<Employee>(e => employeeCountByVisitor++)
+            });
             var concreteDuck = VisitorFactory<IPersonVisitor>.Create(new ConcreteDuck());
             concreteVisitor = new ConcreteVisitor();
 

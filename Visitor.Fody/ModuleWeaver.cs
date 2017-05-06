@@ -186,15 +186,8 @@ namespace Visitor.Fody
                         }
 
 
-                        //var visitorProperties = visitorTypeDefintion.Properties.Where(x =>
-                        //    x.PropertyType is GenericInstanceType
-                        //).Cast<GenericInstanceType>().Where(x =>
-                        //    x.generic
-                        //);
-
                         foreach (var prop in visitorTypeDefintion.Properties)
                         {
-                            //var propDef = prop.Resolve();
                             if (prop.PropertyType is GenericInstanceType propTypeRef)
                             {
                                 var propTypeDef = propTypeRef.Resolve();
@@ -206,18 +199,8 @@ namespace Visitor.Fody
 
                                 LogInfo($"\t{visitorTypeDefintion.Name}.{prop.Name} = {prop.PropertyType.FullName} => {parameterType} | {propTypeDef.Methods.Where(x => x.Name == "Invoke").First().GetGeneric()}");
 
-                                //var invokeOfTypeRef = new GenericInstanceMethod(propTypeDef.Methods.Where(x => x.Name == "Invoke").First());
-                                //invokeOfTypeRef.DeclaringType = ModuleDefinition.ImportReference(prop.PropertyType);
-                                //var invokeOfTypeRef = new MethodReference()
-                                var invokeOfTypeGenericParameter = new GenericParameter(prop.PropertyType);
-                                var invokeOfTypeRef = new MethodReference("Invoke", ModuleDefinition.TypeSystem.Void, prop.PropertyType);
-                                invokeOfTypeRef.HasThis = true;
-                                invokeOfTypeRef.GenericParameters.Add(invokeOfTypeGenericParameter);
-                                invokeOfTypeRef.Parameters.Add(new ParameterDefinition(invokeOfTypeGenericParameter));
-
-                                //propTypeDef.Methods.Where(x => x.Name == "Invoke").First().MakeHostInstanceGeneric
-
-                                //var actionInvokeDefinition = new MethodDefinition()
+                                var invokeMethodDef = propTypeDef.Methods.Where(x => x.Name == "Invoke").First();
+                                var invokeMethodRef = ModuleDefinition.ImportReference(invokeMethodDef).MakeGeneric(propTypeRef.GenericArguments.ToArray());
 
                                 if (!impls.ContainsKey(parameterType))
                                 {
@@ -233,7 +216,7 @@ namespace Visitor.Fody
                                         Instruction.Create(OpCodes.Br, opRet),
                                         labelNotNull,
                                         Instruction.Create(OpCodes.Ldarg_1),
-                                        Instruction.Create(OpCodes.Callvirt, ModuleDefinition.ImportReference(invokeOfTypeRef)),
+                                        Instruction.Create(OpCodes.Callvirt, ModuleDefinition.ImportReference(invokeMethodRef)),
                                         opRet
                                     });
                                 }
