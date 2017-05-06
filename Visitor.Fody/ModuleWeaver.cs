@@ -170,7 +170,7 @@ namespace Visitor.Fody
 
                         foreach (var method in visitorMethods)
                         {
-                            LogInfo($"\t{visitorTypeDefintion.Name}.{method.Name}({string.Join(", ", method.Parameters.Select(x => x.ParameterType.Name))})");
+                            //LogInfo($"\t{visitorTypeDefintion.Name}.{method.Name}({string.Join(", ", method.Parameters.Select(x => x.ParameterType.Name))})");
 
                             var parameterType = method.Parameters.First().ParameterType;
 
@@ -197,7 +197,7 @@ namespace Visitor.Fody
 
                                 var parameterType = propTypeRef.GenericArguments.First();
 
-                                LogInfo($"\t{visitorTypeDefintion.Name}.{prop.Name} = {prop.PropertyType.FullName} => {parameterType} | {propTypeDef.Methods.Where(x => x.Name == "Invoke").First().GetGeneric()}");
+                                //LogInfo($"\t{visitorTypeDefintion.Name}.{prop.Name} = {prop.PropertyType.FullName} => {parameterType} | {propTypeDef.Methods.Where(x => x.Name == "Invoke").First()}");
 
                                 var invokeMethodDef = propTypeDef.Methods.Where(x => x.Name == "Invoke").First();
                                 var invokeMethodRef = ModuleDefinition.ImportReference(invokeMethodDef).MakeGeneric(propTypeRef.GenericArguments.ToArray());
