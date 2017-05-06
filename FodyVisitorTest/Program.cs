@@ -39,7 +39,7 @@ namespace FodyVisitorTest
 
             foreach (var person in people)
             {
-                person.Accept(concreteDuck);
+                person.Accept(concreteDelegate);
             }
 
             Console.WriteLine($"There are {employeeCountByVisitor} employees.");

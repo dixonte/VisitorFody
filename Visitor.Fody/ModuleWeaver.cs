@@ -44,7 +44,7 @@ namespace Visitor.Fody
                 && type.Name.Contains("AnonymousType")
                 && (type.Name.StartsWith("<>") || type.Name.StartsWith("VB$"))
                 && (type.Attributes & TypeAttributes.NotPublic) == TypeAttributes.NotPublic
-                && type.CustomAttributes.Where(x => x.AttributeType.Name == "CompilerGeneratedAttribute").Any();
+                && type.CustomAttributes.Where(x => x.AttributeType.FullName == typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute).FullName).Any();
         }
 
 
@@ -181,15 +181,36 @@ namespace Visitor.Fody
                             }
                         }
 
-                        foreach (PropertyDefinition prop in visitorTypeDefintion.Properties)
+                        foreach (var prop in visitorTypeDefintion.Properties)
                         {
-                            var propDef = prop.Resolve();
-                            var propTypeRef = propDef.PropertyType;
-                            var propTypeDef = propTypeRef.Resolve();
+                            //var propDef = prop.Resolve();
+                            if (prop.PropertyType is GenericInstanceType propTypeRef)
+                            {
+                                var propTypeDef = propTypeRef.Resolve();
+                                var parameterType = propTypeRef.GenericArguments.First();
+                                
+                                LogInfo($"\t{visitorTypeDefintion.Name}.{prop.Name} = {prop.PropertyType.FullName} => {parameterType} | {propTypeDef.Methods.Where(x => x.Name == "Invoke").First()}");
 
-                            LogInfo($"\t{visitorTypeDefintion.Name}.{propDef.Name} = {propDef.PropertyType.FullName} => {propTypeDef}");
 
-
+                                var labelNotNull = Instruction.Create(OpCodes.Nop);
+                                var opRet = Instruction.Create(OpCodes.Ret);
+                                
+                                if (!impls.ContainsKey(parameterType))
+                                {
+                                    impls.Add(parameterType, new Instruction[] {
+                                        Instruction.Create(OpCodes.Ldarg_0),
+                                        Instruction.Create(OpCodes.Call, ModuleDefinition.ImportReference(prop.GetMethod)),
+                                        Instruction.Create(OpCodes.Dup),
+                                        Instruction.Create(OpCodes.Brtrue, labelNotNull),
+                                        Instruction.Create(OpCodes.Pop),
+                                        Instruction.Create(OpCodes.Br, opRet),
+                                        labelNotNull,
+                                        Instruction.Create(OpCodes.Ldarg_1),
+                                        Instruction.Create(OpCodes.Callvirt, ModuleDefinition.ImportReference(propTypeDef.Methods.Where(x => x.Name == "Invoke").First().GetGeneric())),
+                                        opRet
+                                    });
+                                }
+                            }
                         }
                     }
 
