@@ -155,7 +155,7 @@ namespace Visitor.Fody
 
                                 var parameterType = propTypeRef.GenericArguments.First();
 
-                                LogInfo(string.Format("\t{0} => {1}", prop.PropertyType.Name, propTypeRef.FullName));
+                                //LogInfo(string.Format("\t{0} => {1}", prop.PropertyType.Name, propTypeRef.FullName));
 
                                 var genericTypedActionRef = GenericActionDefinition.MakeGenericInstanceType(parameterType);
 
@@ -179,7 +179,7 @@ namespace Visitor.Fody
                                         Instruction.Create(OpCodes.Callvirt, ModuleDefinition.ImportReference(invokeMethodRef)),
                                         opRet
                                     });
-                                    implsBy.Add(parameterType, $"{visitorTypeDefintion.Name}.{prop.Name} => {prop.PropertyType.FullName}");
+                                    implsBy.Add(parameterType, $"{visitorTypeDefintion.Name}.{prop.Name}");
                                 }
                             }
                         }
