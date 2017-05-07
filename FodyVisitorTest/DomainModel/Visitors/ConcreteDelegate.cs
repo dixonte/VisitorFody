@@ -10,11 +10,5 @@ namespace FodyVisitorTest.DomainModel.Visitors
     {
         public Action<Employee> Employee { get; set; }
         public Action<Director> Director { get; set; }
-
-        public Action<Person> Person { get; set; }
-        public void Vart(Person person)
-        {
-            Person?.Invoke(person);
-        }
     }
 }

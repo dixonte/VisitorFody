@@ -25,24 +25,32 @@ namespace FodyVisitorTest
 
             int employeeCountByVisitor = 0;
 
-            var anonymousVisitor = VisitorFactory<IPersonVisitor>.Create(new {
+            var anon = new
+            {
                 Employee = new Action<Employee>(e => employeeCountByVisitor++),
                 Director = new Action<Director>(d =>
                 {
                     d.PlayGolf();
                 })
-            }, ActionOnMissing.NoOp);
-            var concreteVisitor = VisitorFactory<IPersonVisitor>.Create(new ConcreteVisitor());
-            var concreteDelegate = VisitorFactory<IPersonVisitor>.Create(new ConcreteDelegate()
-            {
-                Employee = new Action<Employee>(e => employeeCountByVisitor++)
-            });
-            var concreteDuck = VisitorFactory<IPersonVisitor>.Create(new ConcreteDuck());
-            concreteVisitor = new ConcreteVisitor();
+            };
+
+            var anonymousVisitor = VisitorFactory<IPersonVisitor>.Create(anon, ActionOnMissing.NoOp);
+            //var concreteVisitor = VisitorFactory<IPersonVisitor>.Create(new ConcreteVisitor());
+            //var concreteDelegate = VisitorFactory<IPersonVisitor>.Create(new ConcreteDelegate()
+            //{
+            //    Employee = new Action<Employee>(e => employeeCountByVisitor++)
+            //});
+            //var concreteDuck = VisitorFactory<IPersonVisitor>.Create(new ConcreteDuck());
+            //concreteVisitor = new ConcreteVisitor();
+
+
+            //anon.Employee(new Employee());
+            //anon.Director(new Director());
+
 
             foreach (var person in people)
             {
-                person.Accept(concreteDelegate);
+                person.Accept(anonymousVisitor);
             }
 
             Console.WriteLine($"There are {employeeCountByVisitor} employees.");

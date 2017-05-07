@@ -169,8 +169,7 @@ namespace Visitor.Fody
 
                                     impls.Add(parameterType, new Instruction[] {
                                         Instruction.Create(OpCodes.Ldarg_0),
-                                        Instruction.Create(OpCodes.Call, ModuleDefinition.ImportReference(prop.GetMethod)),
-                                        Instruction.Create(OpCodes.Isinst, ModuleDefinition.ImportReference(genericTypedActionRef)),
+                                        Instruction.Create(OpCodes.Call, ModuleDefinition.ImportReference(prop.GetMethod.MakeGeneric(genericTypeRef.GenericArguments.ToArray()))),
                                         Instruction.Create(OpCodes.Dup),
                                         Instruction.Create(OpCodes.Brtrue, labelNotNull),
                                         Instruction.Create(OpCodes.Pop),
