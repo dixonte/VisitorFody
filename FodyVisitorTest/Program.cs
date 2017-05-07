@@ -43,7 +43,6 @@ namespace FodyVisitorTest
             var concreteDuck = VisitorFactory<IPersonVisitor>.Create(new ConcreteDuck());
             concreteVisitor = new ConcreteVisitor();
 
-
             //anon.Employee(new Employee());
             //anon.Director(new Director());
 

@@ -48,7 +48,6 @@
     <Compile Include="DomainModel\Person.cs" />
     <Compile Include="DomainModel\Visitors\ConcreteDelegate.cs" />
     <Compile Include="DomainModel\Visitors\ConcreteDuck.cs" />
-    <Compile Include="DomainModel\Visitors\ConcreteGenericDelegate.cs" />
     <Compile Include="DomainModel\Visitors\ConcreteVisitor.cs" />
     <Compile Include="DomainModel\Visitors\IPersonVisitor.cs" />
     <Compile Include="Program.cs" />
