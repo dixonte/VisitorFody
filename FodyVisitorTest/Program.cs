@@ -64,7 +64,7 @@ namespace FodyVisitorTest
 
             foreach (var person in people)
             {
-                person.Accept(anonymousVisitor);
+                person.Accept(delegateDuck);
             }
 
             Console.WriteLine($"There are {employeeCountByVisitor} employees.");
