@@ -106,7 +106,12 @@ namespace Visitor.Fody
                 var interfaceTypeReference = declaringGenericType.GenericArguments.First();
                 var interfaceTypeDefinition = interfaceTypeReference.Resolve();
 
-                if (visitorTypeDefintion.Interfaces.Where(x => x.InterfaceType == interfaceTypeReference).Any())
+                if (visitorTypeDefintion.Module != ModuleDefinition)
+                {
+                    LogWarning($"Create references referenced assembly {visitorTypeDefintion.Module.Name}");
+                }
+
+                if (visitorTypeDefintion.Interfaces.Where(x => x.InterfaceType.FullName == interfaceTypeReference.FullName).Any())
                 {
                     LogWarning(string.Format("{0} already implements {1}, skipping implementation.", visitorTypeDefintion.FullName, interfaceTypeReference.FullName));
                 }
@@ -114,17 +119,17 @@ namespace Visitor.Fody
                 {
                     LogInfo($"Replacing call {declaringTypeReference.Namespace}.{declaringTypeReference.Name}<{interfaceTypeReference.FullName}>::{originalMethodReference.Name}<{visitorTypeReference.FullName}> ({actionOnMissing} on missing)");
 
-                    visitorTypeDefintion.Interfaces.Add(new InterfaceImplementation(interfaceTypeReference));
+                    visitorTypeDefintion.Interfaces.Add(new InterfaceImplementation(ModuleDefinition.ImportReference(interfaceTypeReference)));
 
-                    var impls = new Dictionary<TypeReference, Instruction[]>();
-                    var implsBy = new Dictionary<TypeReference, string>();
+                    var impls = new Dictionary<string, Instruction[]>();
+                    var implsBy = new Dictionary<string, string>();
 
                     // TODO: Limit methods to those named Accept? Compile error on non-matching method?
                     var interfaceMethodDefinitions = interfaceTypeDefinition.Methods.Where(x =>
                         x.Parameters.Count == 1
                         && x.Parameters.First().ParameterType.Resolve().Methods.Where(y =>
                             y.Parameters.Count == 1
-                            && y.Parameters.First().ParameterType == interfaceTypeReference
+                            && y.Parameters.First().ParameterType.FullName == interfaceTypeReference.FullName
                         ).Any()
                     ).ToList();
 
@@ -156,21 +161,24 @@ namespace Visitor.Fody
                                 if (propTypeDef != GenericActionDefinition)
                                     continue;
 
-                                var parameterType = propTypeRef.GenericArguments.First();
+                                var parameterType = ModuleDefinition.ImportReference(propTypeRef.GenericArguments.First());
+                                var parameterTypeName = parameterType.FullName;
+
+                                //LogInfo($"{string.Join(", ", genericTypeRef.GenericArguments.Select(a => a.FullName))}");
 
                                 //LogInfo(string.Format("\t{0} => {1}", prop.PropertyType.Name, propTypeRef.FullName));
 
-                                var genericTypedActionRef = GenericActionDefinition.MakeGenericInstanceType(parameterType);
+                                //var genericTypedActionRef = GenericActionDefinition.MakeGenericInstanceType(parameterType);
 
                                 var invokeMethodDef = GenericActionDefinition.Methods.Where(m => m.Name == "Invoke").First();
                                 var invokeMethodRef = ModuleDefinition.ImportReference(invokeMethodDef).MakeGeneric(parameterType);
 
-                                if (!impls.ContainsKey(parameterType))
+                                if (!impls.ContainsKey(parameterTypeName))
                                 {
                                     var labelNotNull = Instruction.Create(OpCodes.Nop);
                                     var opRet = Instruction.Create(OpCodes.Ret);
 
-                                    impls.Add(parameterType, new Instruction[] {
+                                    impls.Add(parameterTypeName, new Instruction[] {
                                         Instruction.Create(OpCodes.Ldarg_0),
                                         Instruction.Create(OpCodes.Call, ModuleDefinition.ImportReference(prop.GetMethod.MakeGeneric(genericTypeRef.GenericArguments.ToArray()))),
                                         Instruction.Create(OpCodes.Dup),
@@ -182,7 +190,7 @@ namespace Visitor.Fody
                                         Instruction.Create(OpCodes.Callvirt, ModuleDefinition.ImportReference(invokeMethodRef)),
                                         opRet
                                     });
-                                    implsBy.Add(parameterType, $"{visitorTypeDefintion.Name}.{prop.Name}");
+                                    implsBy.Add(parameterTypeName, $"{visitorTypeDefintion.Name}.{prop.Name}");
                                 }
                             }
                         }
@@ -193,9 +201,9 @@ namespace Visitor.Fody
                         var visitorMethods = visitorTypeDefintion.Methods.Where(x =>
                             x.Parameters.Count == 1
                             && !x.Name.Contains(".")
-                            && x.Parameters[0].ParameterType.Resolve().Methods.Where(m => 
-                                m.Parameters.Count == 1 
-                                && m.Parameters[0].ParameterType == interfaceTypeReference
+                            && x.Parameters[0].ParameterType.Resolve().Methods.Where(m =>
+                                m.Parameters.Count == 1
+                                && m.Parameters[0].ParameterType.FullName == interfaceTypeReference.FullName
                             ).Any()
                         );
 
@@ -203,17 +211,18 @@ namespace Visitor.Fody
                         {
                             //LogInfo($"\t{visitorTypeDefintion.Name}.{method.Name}({string.Join(", ", method.Parameters.Select(x => x.ParameterType.Name))})");
 
-                            var parameterType = method.Parameters.First().ParameterType;
+                            var parameterType = ModuleDefinition.ImportReference(method.Parameters.First().ParameterType);
+                            var parameterTypeName = parameterType.FullName;
 
-                            if (!impls.ContainsKey(parameterType))
+                            if (!impls.ContainsKey(parameterTypeName))
                             {
-                                impls.Add(parameterType, new Instruction[] {
+                                impls.Add(parameterTypeName, new Instruction[] {
                                     Instruction.Create(OpCodes.Ldarg_0),
                                     Instruction.Create(OpCodes.Ldarg_1),
                                     Instruction.Create(OpCodes.Call, method),
                                     Instruction.Create(OpCodes.Ret)
                                 });
-                                implsBy.Add(parameterType, $"{visitorTypeDefintion.Name}.{method.Name}({string.Join(", ", method.Parameters.Select(x => x.ParameterType.Name))})");
+                                implsBy.Add(parameterTypeName, $"{visitorTypeDefintion.Name}.{method.Name}({string.Join(", ", method.Parameters.Select(x => x.ParameterType.Name))})");
                             }
                         }
 
@@ -227,19 +236,20 @@ namespace Visitor.Fody
                                 if (propTypeDef != GenericActionDefinition)
                                     continue;
 
-                                var parameterType = propTypeRef.GenericArguments.First();
+                                var parameterType = ModuleDefinition.ImportReference(propTypeRef.GenericArguments.First());
+                                var parameterTypeName = parameterType.FullName;
 
                                 //LogInfo($"\t{visitorTypeDefintion.Name}.{prop.Name} => {prop.PropertyType.FullName}");
 
                                 var invokeMethodDef = propTypeDef.Methods.Where(x => x.Name == "Invoke").First();
                                 var invokeMethodRef = ModuleDefinition.ImportReference(invokeMethodDef).MakeGeneric(propTypeRef.GenericArguments.ToArray());
 
-                                if (!impls.ContainsKey(parameterType))
+                                if (!impls.ContainsKey(parameterTypeName))
                                 {
                                     var labelNotNull = Instruction.Create(OpCodes.Nop);
                                     var opRet = Instruction.Create(OpCodes.Ret);
 
-                                    impls.Add(parameterType, new Instruction[] {
+                                    impls.Add(parameterTypeName, new Instruction[] {
                                         Instruction.Create(OpCodes.Ldarg_0),
                                         Instruction.Create(OpCodes.Call, ModuleDefinition.ImportReference(prop.GetMethod)),
                                         Instruction.Create(OpCodes.Dup),
@@ -251,13 +261,13 @@ namespace Visitor.Fody
                                         Instruction.Create(OpCodes.Callvirt, ModuleDefinition.ImportReference(invokeMethodRef)),
                                         opRet
                                     });
-                                    implsBy.Add(parameterType, $"{visitorTypeDefintion.Name}.{prop.Name} => {prop.PropertyType.FullName}");
+                                    implsBy.Add(parameterTypeName, $"{visitorTypeDefintion.Name}.{prop.Name} => {prop.PropertyType.FullName}");
                                 }
                             }
                         }
                     }
 
-
+                    LogInfo($"Found {impls.Count} implementations");
                     foreach (var interfaceMethod in interfaceMethodDefinitions)
                     {
                         var methodName = interfaceTypeDefinition.FullName + "." + interfaceMethod.Name;
@@ -272,18 +282,21 @@ namespace Visitor.Fody
                                 | MethodAttributes.VtableLayoutMask,
                             ModuleDefinition.TypeSystem.Void
                         );
-                        impl.Parameters.Add(interfaceMethod.Parameters[0]);
+
+                        var oldParameter = interfaceMethod.Parameters.First();
+
+                        impl.Parameters.Add(new ParameterDefinition(oldParameter.Name, oldParameter.Attributes, ModuleDefinition.ImportReference(oldParameter.ParameterType)));
                         impl.Overrides.Add(ModuleDefinition.ImportReference(interfaceMethod));
 
-                        var parameterType = interfaceMethod.Parameters.First().ParameterType;
+                        var parameterTypeName = ModuleDefinition.ImportReference(interfaceMethod.Parameters.First().ParameterType).FullName;
 
-                        if (impls.ContainsKey(parameterType))
+                        if (impls.ContainsKey(parameterTypeName))
                         {
-                            impl.Body.Instructions.Append(impls[parameterType]);
+                            impl.Body.Instructions.Append(impls[parameterTypeName]);
 
-                            if (implsBy.ContainsKey(parameterType))
+                            if (implsBy.ContainsKey(parameterTypeName))
                             {
-                                LogInfo($"\t\t\\-> {implsBy[parameterType]}");
+                                LogInfo($"\t\t\\-> {implsBy[parameterTypeName]}");
                             }
                         }
                         else
@@ -313,6 +326,8 @@ namespace Visitor.Fody
 
                 toDelete.Add(call.Previous);
                 toDelete.Add(call);
+
+                
             }
 
             foreach(var instruction in toDelete)
