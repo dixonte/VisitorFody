@@ -129,20 +129,13 @@ namespace Visitor.Fody
                     {
                         LogInfo($"\t{visitorTypeDefintion.Name} is anonymous.");
 
-                        var param = call.Previous.Previous;
-                        if (param.OpCode != OpCodes.Newobj)
-                        {
-                            throw new WeavingException("Anonymous type parameters must be declared in-situ.");
-                        }
-
-                        var anonMethodRef = (MethodReference)param.Operand;
-                        var genericTypeRef = anonMethodRef.DeclaringType as GenericInstanceType;
+                        var genericTypeRef = originalMethodReference.GenericArguments.First() as GenericInstanceType;
                         if (genericTypeRef == null)
                         {
                             throw new WeavingException("Anonymous type unexpectedly not GenericInstanceType!");
                         }
 
-                        LogInfo($"\tIs gen instance: {string.Join("\t", genericTypeRef.GenericArguments.Where(x => x is GenericInstanceType).Cast<GenericInstanceType>().Select(x => x.GenericArguments[0]))}");
+                        //LogInfo($"\tIs gen instance: {string.Join("\t", genericTypeRef.GenericArguments.Where(x => x is GenericInstanceType).Cast<GenericInstanceType>().Select(x => x.GenericArguments[0]))}");
 
                         TypeDefinition anonMethodDef = genericTypeRef.Resolve();
                         if (genericTypeRef.GenericArguments.Count != anonMethodDef.Properties.Count)
@@ -152,10 +145,44 @@ namespace Visitor.Fody
 
                         for (int x = 0; x < genericTypeRef.GenericArguments.Count; x++)
                         {
-                            TypeReference genericArg = genericTypeRef.GenericArguments[x];
-                            PropertyDefinition prop = anonMethodDef.Properties[x];
+                            if (genericTypeRef.GenericArguments[x] is GenericInstanceType propTypeRef)
+                            {
+                                var prop = anonMethodDef.Properties[x];
+                                var propTypeDef = propTypeRef.Resolve();
 
-                            LogInfo(string.Format("\t{0} => {1}", prop.PropertyType.Name, genericArg.FullName));
+                                if (propTypeDef != GenericActionDefinition)
+                                    continue;
+
+                                var parameterType = propTypeRef.GenericArguments.First();
+
+                                LogInfo(string.Format("\t{0} => {1}", prop.PropertyType.Name, propTypeRef.FullName));
+
+                                var genericTypedActionRef = GenericActionDefinition.MakeGenericInstanceType(parameterType);
+
+                                var invokeMethodDef = GenericActionDefinition.Methods.Where(m => m.Name == "Invoke").First();
+                                var invokeMethodRef = ModuleDefinition.ImportReference(invokeMethodDef).MakeGeneric(parameterType);
+
+                                if (!impls.ContainsKey(parameterType))
+                                {
+                                    var labelNotNull = Instruction.Create(OpCodes.Nop);
+                                    var opRet = Instruction.Create(OpCodes.Ret);
+
+                                    impls.Add(parameterType, new Instruction[] {
+                                        Instruction.Create(OpCodes.Ldarg_0),
+                                        Instruction.Create(OpCodes.Call, ModuleDefinition.ImportReference(prop.GetMethod)),
+                                        Instruction.Create(OpCodes.Isinst, ModuleDefinition.ImportReference(genericTypedActionRef)),
+                                        Instruction.Create(OpCodes.Dup),
+                                        Instruction.Create(OpCodes.Brtrue, labelNotNull),
+                                        Instruction.Create(OpCodes.Pop),
+                                        Instruction.Create(OpCodes.Br, opRet),
+                                        labelNotNull,
+                                        Instruction.Create(OpCodes.Ldarg_1),
+                                        Instruction.Create(OpCodes.Callvirt, ModuleDefinition.ImportReference(invokeMethodRef)),
+                                        opRet
+                                    });
+                                    implsBy.Add(parameterType, $"{visitorTypeDefintion.Name}.{prop.Name} => {prop.PropertyType.FullName}");
+                                }
+                            }
                         }
                     }
                     else
