@@ -21,7 +21,7 @@ namespace Visitor.Fody
         private MethodReference NotImplementedExceptionRef { get; set; }
         private TypeReference GenericActionRef { get; set; }
         private TypeDefinition GenericActionDefinition { get; set; }
-
+        
         public ModuleWeaver()
         {
             LogInfo = s => { };
@@ -122,7 +122,7 @@ namespace Visitor.Fody
 
                     var implementationType = new TypeDefinition(
                         string.Concat("Visitor.Fody.", interfaceTypeDefinition.Namespace), 
-                        string.Concat(interfaceTypeDefinition.Name, "_", visitorTypeReference.Name, "_", Guid.NewGuid().ToString()), 
+                        string.Concat("Impl_", interfaceTypeDefinition.Name, "_", visitorTypeReference.Name, "_", Guid.NewGuid().ToString().Replace("-", "_")), 
                         TypeAttributes.Public | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit
                     );
                     implementationType.BaseType = ModuleDefinition.TypeSystem.Object;
