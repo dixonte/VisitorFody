@@ -76,6 +76,7 @@ namespace Visitor.Fody
             body.SimplifyMacros();
 
             var calls = body.Instructions.Where(i => i.OpCode == OpCodes.Call);
+            var toDelete = new List<Instruction>();
 
             foreach (var call in calls)
             {
@@ -307,8 +308,13 @@ namespace Visitor.Fody
                     }
                 }
 
-                call.Previous.OpCode = OpCodes.Nop;
-                call.OpCode = OpCodes.Nop;
+                toDelete.Add(call.Previous);
+                toDelete.Add(call);
+            }
+
+            foreach(var instruction in toDelete)
+            {
+                body.Instructions.Remove(instruction);
             }
 
             body.InitLocals = true;
