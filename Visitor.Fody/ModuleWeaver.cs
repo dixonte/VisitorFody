@@ -4,8 +4,8 @@ using Mono.Cecil.Rocks;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
+// TODO: Add safety and code completeness checks
 
 namespace Visitor.Fody
 {
@@ -39,7 +39,7 @@ namespace Visitor.Fody
             ProcessAssembly(ModuleDefinition.GetTypes());
 
             CleanAttributes();
-            //CleanReferences();
+            CleanReferences();
         }
 
         private static bool IsAnonymousType(TypeDefinition type)
@@ -71,6 +71,7 @@ namespace Visitor.Fody
             }
         }
 
+        // TODO: Clean up this massive mess of a method
         private void ReplaceCalls(MethodBody body)
         {
             body.SimplifyMacros();
@@ -118,6 +119,7 @@ namespace Visitor.Fody
                     var impls = new Dictionary<TypeReference, Instruction[]>();
                     var implsBy = new Dictionary<TypeReference, string>();
 
+                    // TODO: Limit methods to those named Accept? Compile error on non-matching method?
                     var interfaceMethodDefinitions = interfaceTypeDefinition.Methods.Where(x =>
                         x.Parameters.Count == 1
                         && x.Parameters.First().ParameterType.Resolve().Methods.Where(y =>
@@ -187,6 +189,7 @@ namespace Visitor.Fody
                     }
                     else
                     {
+                        // TODO: Further limit what methods qualify? Match the interface name? Must be named Visit?
                         var visitorMethods = visitorTypeDefintion.Methods.Where(x =>
                             x.Parameters.Count == 1
                             && !x.Name.Contains(".")

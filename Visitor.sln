@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26403.3
+VisualStudioVersion = 15.0.26403.7
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FodyVisitorTest", "FodyVisitorTest\FodyVisitorTest.csproj", "{BBA1F9FD-C460-4899-A4F9-7F96B1A2C4FE}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -11,6 +11,11 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Visitor", "Visitor\Visitor.csproj", "{88EA95D5-6376-4DEF-AAD1-C9308DFBC287}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Visitor.Fody", "Visitor.Fody\Visitor.Fody.csproj", "{5E018EAF-8FC6-4527-90A2-E911E32115DC}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Common", "Common", "{63F4CE53-EA4E-4D78-8D8C-D7B9284F61FD}"
+	ProjectSection(SolutionItems) = preProject
+		SharedAssemblyInfo.cs = SharedAssemblyInfo.cs
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
