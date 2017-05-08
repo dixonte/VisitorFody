@@ -47,6 +47,10 @@ namespace Visitor.Fody
                     LogInfo($"Adding Accept({interfaceType.Name}) to {classReference.FullName}");
                     taggedClass.Methods.Add(CreateAcceptMethod("Accept", methodReference, interfaceReference));
                 }
+                else
+                {
+                    LogWarning($"{classReference.FullName} already has an Accept({interfaceType.Name}) method, skipping.");
+                }
             }
         }
 

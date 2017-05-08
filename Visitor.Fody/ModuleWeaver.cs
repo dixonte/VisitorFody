@@ -86,14 +86,12 @@ namespace Visitor.Fody
                     continue;
 
                 if (!(call.Previous.OpCode == OpCodes.Ldc_I4))
-                    throw new WeavingException("Create's last parameter must be a boolean constant.");
+                    throw new WeavingException("Create's last parameter must be an Int32 constant.");
 
                 var originalMethodReference = (GenericInstanceMethod)call.Operand;
-                var originalMethodDefinition = originalMethodReference.Resolve();
                 var declaringTypeReference = originalMethodReference.DeclaringType;
-                var declaringTypeDefinition = declaringTypeReference.Resolve();
 
-                if (originalMethodReference.Name != "Create" || !declaringTypeReference.FullName.StartsWith("Visitor.VisitorFactory`") || !originalMethodDefinition.ContainsGenericParameter || !declaringTypeReference.IsGenericInstance)
+                if (originalMethodReference.Name != "Create" || !declaringTypeReference.FullName.StartsWith("Visitor.VisitorFactory`") || !originalMethodReference.ContainsGenericParameter || !declaringTypeReference.IsGenericInstance)
                 {
                     //LogInfo($"Skipping call {originalMethodReference.Name} on class {declaringTypeReference.FullName}");
                     continue;
@@ -109,7 +107,7 @@ namespace Visitor.Fody
 
                 if (visitorTypeDefintion.Interfaces.Where(x => x.InterfaceType.FullName == interfaceTypeReference.FullName).Any())
                 {
-                    LogWarning(string.Format("{0} already implements {1}, skipping implementation.", visitorTypeDefintion.FullName, interfaceTypeReference.FullName));
+                    LogWarning($"{visitorTypeDefintion.FullName} already implements {interfaceTypeReference.FullName}, skipping.");
 
                     toDelete.Add(call.Previous);
                     toDelete.Add(call);
@@ -157,7 +155,7 @@ namespace Visitor.Fody
                         x.Parameters.Count == 1
                         && x.Parameters.First().ParameterType.Resolve().Methods.Where(y =>
                             y.Parameters.Count == 1
-                            && y.Parameters.First().ParameterType.FullName == interfaceTypeReference.FullName
+                            && y.Parameters.First().ParameterType.Resolve() == interfaceTypeReference.Resolve()
                         ).Any()
                     ).ToList();
 

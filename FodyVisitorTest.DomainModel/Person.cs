@@ -11,9 +11,9 @@ namespace FodyVisitorTest.DomainModel
         public Guid Id { get; set; }
         public string Name { get; set; }
 
-        //public virtual void Accept(Visitors.IPersonVisitor visitor)
-        //{
-        //    throw new NotImplementedException();
-        //}
+        public virtual void Accept(Visitors.IPersonVisitor visitor)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
