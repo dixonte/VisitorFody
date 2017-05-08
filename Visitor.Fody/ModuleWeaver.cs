@@ -11,16 +11,17 @@ namespace Visitor.Fody
 {
     public partial class ModuleWeaver
     {
+        // Auto populated by Fody
         public Action<string> LogInfo { get; set; }
         public Action<string> LogWarning { get; set; }
         public Action<string> LogError { get; set; }
         public ModuleDefinition ModuleDefinition { get; set; }
 
+        // Cached types
         private MethodReference NotImplementedExceptionRef { get; set; }
         private TypeReference GenericActionRef { get; set; }
         private TypeDefinition GenericActionDefinition { get; set; }
-
-
+        
         public ModuleWeaver()
         {
             LogInfo = s => { };
@@ -106,20 +107,47 @@ namespace Visitor.Fody
                 var interfaceTypeReference = declaringGenericType.GenericArguments.First();
                 var interfaceTypeDefinition = interfaceTypeReference.Resolve();
 
-                if (visitorTypeDefintion.Module != ModuleDefinition)
-                {
-                    LogWarning($"Create references referenced assembly {visitorTypeDefintion.Module.Name}");
-                }
-
                 if (visitorTypeDefintion.Interfaces.Where(x => x.InterfaceType.FullName == interfaceTypeReference.FullName).Any())
                 {
                     LogWarning(string.Format("{0} already implements {1}, skipping implementation.", visitorTypeDefintion.FullName, interfaceTypeReference.FullName));
+
+                    toDelete.Add(call.Previous);
+                    toDelete.Add(call);
                 }
                 else
                 {
                     LogInfo($"Replacing call {declaringTypeReference.Namespace}.{declaringTypeReference.Name}<{interfaceTypeReference.FullName}>::{originalMethodReference.Name}<{visitorTypeReference.FullName}> ({actionOnMissing} on missing)");
 
-                    visitorTypeDefintion.Interfaces.Add(new InterfaceImplementation(ModuleDefinition.ImportReference(interfaceTypeReference)));
+
+
+                    var implementationType = new TypeDefinition(
+                        string.Concat("Visitor.Fody.", interfaceTypeDefinition.Namespace), 
+                        string.Concat("Impl_", interfaceTypeDefinition.Name, "_", visitorTypeReference.Name, "_", Guid.NewGuid().ToString().Replace("-", "_")), 
+                        TypeAttributes.Public | TypeAttributes.AnsiClass | TypeAttributes.BeforeFieldInit
+                    );
+                    implementationType.BaseType = ModuleDefinition.TypeSystem.Object;
+                    implementationType.Interfaces.Add(new InterfaceImplementation(ModuleDefinition.ImportReference(interfaceTypeReference)));
+                    FieldDefinition wrappedTypeFieldDef;
+                    implementationType.Fields.Add(wrappedTypeFieldDef = new FieldDefinition("_wrappedType", FieldAttributes.Private, ModuleDefinition.ImportReference(visitorTypeReference)));
+                    MethodDefinition implementationTypeCtorDef;
+                    implementationType.Methods.Add(implementationTypeCtorDef = new MethodDefinition(".ctor", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName, ModuleDefinition.TypeSystem.Void));
+                    implementationTypeCtorDef.Parameters.Add(new ParameterDefinition("wrappedType", ParameterAttributes.None, ModuleDefinition.ImportReference(visitorTypeReference)));
+                    implementationTypeCtorDef.Body.Instructions.Append(
+                        Instruction.Create(OpCodes.Ldarg_0),
+                        Instruction.Create(OpCodes.Call, ModuleDefinition.ImportReference(ModuleDefinition.TypeSystem.Object.Resolve().GetConstructors().First(c => !c.HasParameters))),
+                        Instruction.Create(OpCodes.Ldarg_0),
+                        Instruction.Create(OpCodes.Ldarg_1),
+                        Instruction.Create(OpCodes.Stfld, wrappedTypeFieldDef),
+                        Instruction.Create(OpCodes.Ret)
+                    );
+                    implementationTypeCtorDef.Body.InitLocals = true;
+                    implementationTypeCtorDef.Body.OptimizeMacros();
+
+                    ModuleDefinition.Types.Add(implementationType);
+
+                    toDelete.Add(call.Previous);
+                    call.OpCode = OpCodes.Newobj;
+                    call.Operand = ModuleDefinition.ImportReference(implementationTypeCtorDef);
 
                     var impls = new Dictionary<string, Instruction[]>();
                     var implsBy = new Dictionary<string, string>();
@@ -180,7 +208,8 @@ namespace Visitor.Fody
 
                                     impls.Add(parameterTypeName, new Instruction[] {
                                         Instruction.Create(OpCodes.Ldarg_0),
-                                        Instruction.Create(OpCodes.Call, ModuleDefinition.ImportReference(prop.GetMethod.MakeGeneric(genericTypeRef.GenericArguments.ToArray()))),
+                                        Instruction.Create(OpCodes.Ldfld, ModuleDefinition.ImportReference(wrappedTypeFieldDef)),
+                                        Instruction.Create(OpCodes.Call, ModuleDefinition.ImportReference(prop.GetMethod.MakeGeneric(genericTypeRef.GenericArguments.Select(a => ModuleDefinition.ImportReference(a)).ToArray()))),
                                         Instruction.Create(OpCodes.Dup),
                                         Instruction.Create(OpCodes.Brtrue, labelNotNull),
                                         Instruction.Create(OpCodes.Pop),
@@ -218,8 +247,9 @@ namespace Visitor.Fody
                             {
                                 impls.Add(parameterTypeName, new Instruction[] {
                                     Instruction.Create(OpCodes.Ldarg_0),
+                                    Instruction.Create(OpCodes.Ldfld, ModuleDefinition.ImportReference(wrappedTypeFieldDef)),
                                     Instruction.Create(OpCodes.Ldarg_1),
-                                    Instruction.Create(OpCodes.Call, method),
+                                    Instruction.Create(OpCodes.Call, ModuleDefinition.ImportReference(method)),
                                     Instruction.Create(OpCodes.Ret)
                                 });
                                 implsBy.Add(parameterTypeName, $"{visitorTypeDefintion.Name}.{method.Name}({string.Join(", ", method.Parameters.Select(x => x.ParameterType.Name))})");
@@ -242,7 +272,7 @@ namespace Visitor.Fody
                                 //LogInfo($"\t{visitorTypeDefintion.Name}.{prop.Name} => {prop.PropertyType.FullName}");
 
                                 var invokeMethodDef = propTypeDef.Methods.Where(x => x.Name == "Invoke").First();
-                                var invokeMethodRef = ModuleDefinition.ImportReference(invokeMethodDef).MakeGeneric(propTypeRef.GenericArguments.ToArray());
+                                var invokeMethodRef = ModuleDefinition.ImportReference(invokeMethodDef).MakeGeneric(propTypeRef.GenericArguments.Select(a => ModuleDefinition.ImportReference(a)).ToArray());
 
                                 if (!impls.ContainsKey(parameterTypeName))
                                 {
@@ -251,6 +281,7 @@ namespace Visitor.Fody
 
                                     impls.Add(parameterTypeName, new Instruction[] {
                                         Instruction.Create(OpCodes.Ldarg_0),
+                                        Instruction.Create(OpCodes.Ldfld, ModuleDefinition.ImportReference(wrappedTypeFieldDef)),
                                         Instruction.Create(OpCodes.Call, ModuleDefinition.ImportReference(prop.GetMethod)),
                                         Instruction.Create(OpCodes.Dup),
                                         Instruction.Create(OpCodes.Brtrue, labelNotNull),
@@ -320,14 +351,12 @@ namespace Visitor.Fody
                                     break;
                             }
                         }
-                        visitorTypeDefintion.Methods.Add(impl);
+                        implementationType.Methods.Add(impl);
                     }
                 }
 
-                toDelete.Add(call.Previous);
-                toDelete.Add(call);
-
-                
+                //toDelete.Add(call.Previous);
+                //toDelete.Add(call);
             }
 
             foreach(var instruction in toDelete)
