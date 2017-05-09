@@ -150,7 +150,9 @@ namespace Visitor.Fody
                     var impls = new Dictionary<string, Instruction[]>();
                     var implsBy = new Dictionary<string, string>();
 
-                    // TODO: Limit methods to those named Accept? Compile error on non-matching method?
+                    // TODO: Limit methods to those named Visit
+                    // TODO: Compile error on non-matching method
+                    // TODO: Make interface validation code callable when implementing interface attribute
                     var interfaceMethodDefinitions = interfaceTypeDefinition.Methods.Where(x =>
                         x.Parameters.Count == 1
                         && x.Parameters.First().ParameterType.Resolve().Methods.Where(y =>
@@ -224,7 +226,7 @@ namespace Visitor.Fody
                     }
                     else
                     {
-                        // TODO: Further limit what methods qualify? Match the interface name? Must be named Visit?
+                        // TODO: Only use methods that match the given interface
                         var visitorMethods = visitorTypeDefintion.Methods.Where(x =>
                             x.Parameters.Count == 1
                             && !x.Name.Contains(".")
